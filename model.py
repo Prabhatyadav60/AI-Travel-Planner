@@ -2,20 +2,25 @@ import streamlit as st
 import requests
 import json
 import os
+import toml  # Missing import
 import re
 import time
 
 if "api" in st.secrets:
     API_KEY = st.secrets["api"]["key"]  
 else:
-  
     secrets_path = ".streamlit/secrets.toml"
     if os.path.exists(secrets_path):
         secrets = toml.load(secrets_path)
         API_KEY = secrets["api"]["key"]
     else:
-        st.error("No API key found! Add it to Streamlit Secrets or a local secrets.toml file.")
+        st.error("🚨 No API key found! Add it to Streamlit Secrets or a local secrets.toml file.")
+        st.stop()
+
+
+URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={API_KEY}"
 headers = {"Content-Type": "application/json"}
+
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
@@ -55,12 +60,12 @@ st.title("🗺️ AI Travel Chatbot")
 st.write("Plan your trip through a friendly chatbot! Answer step-by-step questions.")
 st.write("Hello! I'm your friendly travel assistant. Ready to plan your next adventure? Let's get started by exploring where you'd like to go!")
 
-
+# Display previous chat messages
 for message in st.session_state.chat_history:
     with st.chat_message(message["role"]):
         st.write(message["content"])
 
-
+# Questions for user input
 questions = [
     "📍 Where are you traveling to?",
     "📅 How many days will you stay?",
@@ -73,24 +78,22 @@ questions = [
     "✏️ Do you have any additional specific requirements?"
 ]
 
-
+# Process user responses step by step
 if st.session_state.step < len(questions):
     user_input = st.chat_input(questions[st.session_state.step])
     
     if user_input:
         st.session_state.chat_history.append({"role": "user", "content": user_input})
         
-     
+        # Store user responses
         if st.session_state.step == 0:
             st.session_state.user_data["destination"] = user_input
         elif st.session_state.step == 1:
-            # Extract numeric duration
             duration = ''.join(filter(str.isdigit, user_input)) or "1"
             st.session_state.user_data["duration"] = int(duration)
         elif st.session_state.step == 2:
             st.session_state.user_data["budget"] = user_input.lower()
         elif st.session_state.step == 3:
-            # Store interests as provided (e.g., "sightseeing, adventure, food")
             st.session_state.user_data["interests"] = user_input
         elif st.session_state.step == 4:
             st.session_state.user_data["accommodation"] = user_input.lower()
@@ -107,17 +110,17 @@ if st.session_state.step < len(questions):
         st.session_state.step += 1
         st.rerun()
 
+# Generate itinerary after collecting all inputs
 elif not st.session_state.itinerary_generated:
-    # Once all inputs are collected, generate the itinerary once
     with st.spinner("🔍 Generating your itinerary..."):
         itinerary = generate_itinerary()
     
     st.session_state.chat_history.append({"role": "assistant", "content": "🎉 Here is your personalized travel itinerary:"})
     st.session_state.chat_history.append({"role": "assistant", "content": itinerary})
     
-    st.session_state.itinerary_generated = True  # Prevent further generation
+    st.session_state.itinerary_generated = True
     st.rerun()
 
-
+# Reset app
 if st.sidebar.button("🔄 Start Over"):
     st.session_state.clear()
